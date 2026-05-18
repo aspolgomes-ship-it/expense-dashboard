@@ -1233,7 +1233,9 @@ function parseRows(rows, source) {
 
 // ── XLSX parsing (simple) ───────────────────────────────────────────────
 async function parseXlsx(buffer) {
-  // Use SheetJS via CDN
+  if (typeof XLSX === 'undefined') {
+    throw new Error('XLSX library not loaded — refresh the page and try again');
+  }
   return new Promise((resolve) => {
     const data = new Uint8Array(buffer);
     const wb = XLSX.read(data, {type:'array', cellDates:true});
