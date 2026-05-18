@@ -951,6 +951,11 @@ async function sendChat() {
   const sendBtn = document.getElementById('sendBtn');
   const msg = input.value.trim();
   if (!msg) return;
+  // Only allow chat if user has unlocked the dashboard (password verified)
+  if (!sessionStorage.getItem('DASH_UNLOCKED')) {
+    appendMsg('ai','⚠️ Please unlock the dashboard first to use the AI chat.');
+    return;
+  }
   const apiKey = localStorage.getItem('ANTHROPIC_KEY');
   if (!apiKey) { appendMsg('ai','⚠️ Set your Anthropic API Key in Settings to use the chat.'); return; }
   appendMsg('user', msg);
@@ -1392,6 +1397,7 @@ updateLabels();
   // No password configured — skip lock and go to settings
   if (!saved) {
     overlay.style.display = 'none';
+    sessionStorage.setItem('DASH_UNLOCKED', '1');
     loadData();
     navigate('settings', document.getElementById('nav-settings'));
     return;
@@ -1403,6 +1409,7 @@ updateLabels();
   function unlock() {
     if (input.value === saved) {
       overlay.style.display = 'none';
+      sessionStorage.setItem('DASH_UNLOCKED', '1');
     } else {
       errEl.textContent = 'Incorrect password';
       input.value = '';
