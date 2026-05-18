@@ -6,6 +6,7 @@
 <title>Expense Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root {
     --sidebar-bg: #2D3F58;
@@ -1355,10 +1356,12 @@ async function runUpload() {
       if (isBank) totalBank+=parsed.length; else totalCard+=parsed.length;
 
       // Send to Apps Script
+      // Apps Script requires text/plain to avoid CORS preflight redirect issues
       const res = await fetch(gasUrl+'?pwd='+encodeURIComponent(pwd)+'&action=append', {
         method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ type: isBank?'bank':'card', rows: parsed })
+        headers:{'Content-Type':'text/plain'},
+        body: JSON.stringify({ type: isBank?'bank':'card', rows: parsed }),
+        redirect: 'follow',
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
