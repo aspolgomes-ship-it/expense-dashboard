@@ -1370,10 +1370,12 @@ async function runUpload() {
 
       // Send to Apps Script
       // Apps Script requires text/plain to avoid CORS preflight redirect issues
+      // Determine card name for server-side per-card date filtering
+      const cardName = parsed.length > 0 ? parsed[0].card : null;
       const res = await fetch(gasUrl+'?pwd='+encodeURIComponent(pwd)+'&action=append', {
         method:'POST',
         headers:{'Content-Type':'text/plain'},
-        body: JSON.stringify({ type: isBank?'bank':'card', rows: parsed }),
+        body: JSON.stringify({ type: isBank?'bank':'card', card_name: cardName, rows: parsed }),
         redirect: 'follow',
       });
       const data = await res.json();
