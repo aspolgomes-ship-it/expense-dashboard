@@ -1357,6 +1357,7 @@ async function runUpload() {
         rows = parseCsv(text);
       }
       const headers = Object.keys(rows[0]||{});
+      logLine(`  Headers: ${headers.slice(0,4).join(', ')}...`);
       const source = detectSource(headers, file.name);
       if (!source) { logLine(`  ✗ Unknown format: ${file.name}`, 'err'); setFileStatus(i,'unknown format','error'); continue; }
       logLine(`  Detected: ${source} (${rows.length} raw rows)`);
