@@ -1125,12 +1125,20 @@ function categorize(desc, map) {
 }
 
 // ── File parsing ────────────────────────────────────────────────────────
-function detectSource(headers) {
+function detectSource(headers, filename) {
   const h = headers.map(x=>String(x).trim());
+  const fn = (filename||'').toLowerCase();
+  // Use filename as primary signal for Citi (AA vs Costco)
   if (h.includes('Transaction Date') && h.includes('Card No.')) return 'capital_one';
   if (h.includes('Card Member') && h.includes('Account #') && h.includes('Amount')) return 'amex';
-  if (h.includes('Status') && h.includes('Debit') && h.includes('Member Name')) return 'citi';
   if (h.includes('Activity Date') && h.includes('Activity') && h.includes('Amount($)')) return 'bank';
+  if (h.includes('Status') && h.includes('Debit') && h.includes('Member Name')) {
+    // Detect Citi card by filename
+    if (/costco/i.test(fn)) return 'citi_costco';
+    if (/aa|airlines|american.?air/i.test(fn)) return 'citi_aa';
+    // Fallback: majority member name
+    return 'citi';
+  }
   return null;
 }
 
@@ -1192,16 +1200,19 @@ function parseRows(rows, source) {
       const member = /ALESSANDRA/i.test(r['Card Member']||'') ? 'Alessandra Gomes' : 'Andre Spolidoro';
       out.push({ date:flexDate(r['Date']), card:'Amex Platinum', description:desc, category:categorize(desc,CARD_CAT_MAP), amount:amount.toFixed(2), member });
 
-    } else if (source === 'citi') {
+    } else if (source === 'citi' || source === 'citi_aa' || source === 'citi_costco') {
       const debit=parseFloat(r['Debit'])||0, credit=parseFloat(r['Credit'])||0;
       const desc=(r['Description']||'').trim().replace(/\s{2,}/g,' ');
-      if ((credit>0&&debit===0)||PAYMENT_RE.test(desc)) continue;
-      const amount = debit>0?debit:-credit;
-      if (amount<=0) continue;
+      if (PAYMENT_RE.test(desc)) continue;
+      if (credit < -500 && debit === 0) continue; // large payment
+      let amount;
+      if (debit !== 0) amount = debit;
+      else if (credit !== 0) amount = credit; // negative = return
+      else continue;
+      if (amount === 0) continue;
       const mn = r['Member Name']||'';
       const member = /ALESSANDRA/i.test(mn)?'Alessandra Gomes':/SPOLIDORO/i.test(mn)?'Andre Spolidoro':mn;
-      const members = rows.map(x=>String(x['Member Name']||'').toUpperCase());
-      const card = members.some(m=>m.includes('SPOLIDORO'))?'Citi Costco':'Citi American Airlines';
+      const card = source==='citi_costco'?'Citi Costco':'Citi American Airlines';
       out.push({ date:flexDate(r['Date']), card, description:desc, category:categorize(desc,CARD_CAT_MAP), amount:amount.toFixed(2), member });
 
     } else if (source === 'bank') {
@@ -1346,7 +1357,7 @@ async function runUpload() {
         rows = parseCsv(text);
       }
       const headers = Object.keys(rows[0]||{});
-      const source = detectSource(headers);
+      const source = detectSource(headers, file.name);
       if (!source) { logLine(`  ✗ Unknown format: ${file.name}`, 'err'); setFileStatus(i,'unknown format','error'); continue; }
       logLine(`  Detected: ${source} (${rows.length} raw rows)`);
       setFileStatus(i, source, 'detected');
