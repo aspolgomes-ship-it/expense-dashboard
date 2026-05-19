@@ -1249,30 +1249,26 @@ async function parseXlsx(buffer) {
   }
   return new Promise((resolve) => {
     const data = new Uint8Array(buffer);
-    const wb = XLSX.read(data, {type:'array', cellDates:true});
+    // Read without cellDates to get raw values for header detection
+    const wb = XLSX.read(data, {type:'array', cellDates:false});
     const ws = wb.Sheets[wb.SheetNames[0]];
-    // Find header row (look for 'Activity Date' or 'Transaction Date')
-    const range = XLSX.utils.decode_range(ws['!ref']||'A1:A1');
+    // Read all as raw strings first to find header row
+    const json = XLSX.utils.sheet_to_json(ws, {header:1, defval:'', raw:false});
+    // Find header row by looking for 'Activity Date' or 'Transaction Date'
     let headerRow = 0;
-    for (let r=0; r<=Math.min(10,range.e.r); r++) {
-      for (let c=range.s.c; c<=range.e.c; c++) {
-        const cell = ws[XLSX.utils.encode_cell({r,c})];
-        if (cell && /Activity Date|Transaction Date/i.test(String(cell.v||''))) {
-          headerRow = r; break;
-        }
+    for (let r = 0; r < Math.min(12, json.length); r++) {
+      const rowStr = json[r].join('|');
+      if (/Activity Date|Transaction Date/i.test(rowStr)) {
+        headerRow = r;
+        break;
       }
     }
-    const json = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
-    const headers = json[headerRow].map(String);
+    const headers = json[headerRow].map(h => String(h).trim());
     const rows = json.slice(headerRow+1).map(row => {
       const obj={};
-      headers.forEach((h,i)=>{
-        let v=row[i]||'';
-        if(v instanceof Date) v=`${(v.getMonth()+1).toString().padStart(2,'0')}/${v.getDate().toString().padStart(2,'0')}/${v.getFullYear()}`;
-        obj[h.trim()]=String(v).trim();
-      });
+      headers.forEach((h,i) => { obj[h] = String(row[i]||'').trim(); });
       return obj;
-    }).filter(r=>Object.values(r).some(v=>v!==''));
+    }).filter(r => Object.values(r).some(v => v !== ''));
     resolve(rows);
   });
 }
